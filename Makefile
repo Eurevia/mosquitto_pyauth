@@ -7,7 +7,7 @@ CFLAGS = -std=gnu99 -fPIC -I../lib -I../src `$(PYTHON_CONFIG) --includes` -Wall 
 ifdef DEBUG
 CFLAGS += -DPYAUTH_DEBUG -O0 -ggdb3
 endif
-LIBS = `$(PYTHON_CONFIG) --libs` -lmosquitto
+LIBS = `$(PYTHON_CONFIG) --libs --embed` -lmosquitto
 DESTDIR = /usr
 
 ifdef USE_CARES
