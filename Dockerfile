@@ -1,3 +1,5 @@
+# Adapted from: https://github.com/iegomez/mosquitto-go-auth
+
 # Define Mosquitto version
 ARG MOSQUITTO_VERSION=2.0.14
 
