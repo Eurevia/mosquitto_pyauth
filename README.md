@@ -3,6 +3,66 @@ mosquitto_pyauth
 
 Mosquitto auth plugin that lets you write your auth plugins in Python.
 
+Docker
+======
+
+You can now build a docker image that you can use to run mosquitto and load the `auth_plugin_pyauth.so` from. This will let you use python to authorise submission and subscription to your mosquitto message broker!
+
+With a directory structure like:
+
+```
+.
+└── mosquitto
+    ├── mosquitto.conf
+    └── mosquitto_auth.py
+```
+
+and file contents like:
+
+```
+# mosquitto/mosquitto.conf
+...
+auth_plugin /mosquitto/auth_plugin_pyauth.so
+auth_opt_pyauth_module mosquitto_auth
+...
+```
+
+and:
+
+```
+# mosquitto/mosquitto_auth.py
+from mosquitto_auth import log, LOG_INFO
+
+def plugin_init(opts):
+    log(LOG_INFO, 'mosquitto_pyauth: starting up!')
+    ...
+
+def unpwd_check(username, password):
+    ...
+    return True
+
+def acl_check(client_id, username, topic, access, payload):
+    ...
+    return True
+
+def psk_key_get(identity, hint):
+    ...
+    # I'm not sure what this does exactly, if someone knows and wants to write some docs...
+    return ''
+```
+
+you should be able to build:
+
+```
+docker buildx build --load  --platform linux/arm64 --tag mosquitto-pyauth .
+```
+
+and run the docker container like so:
+
+```
+docker run -v ${PWD}/mosquitto:/etc/mosquitto -p 1883:1883 -p 1884:1884 -e PYTHONPATH=/etc/mosquitto mosquitto-pyauth
+```
+
 Compiling
 =========
 
