@@ -120,7 +120,7 @@ RUN ldconfig;
 
 RUN pip3 install --break-system-packages firebase_admin;
 
-EXPOSE 1883 1884
+EXPOSE 1884
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD [ "/usr/sbin/mosquitto" ,"-c", "/mosquitto/config/mosquitto.conf" ]
