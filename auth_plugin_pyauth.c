@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <assert.h>
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <mosquitto.h>
 #include <mosquitto_plugin.h>
