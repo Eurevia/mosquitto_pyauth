@@ -1,55 +1,33 @@
 # Adapted from: https://github.com/iegomez/mosquitto-go-auth
 
-# Define Mosquitto version
-ARG MOSQUITTO_VERSION=2.0.15
-# Define libwebsocket version
-ARG LWS_VERSION=4.2.2
+# Mosquitto version
+# 2.0.15 → false "disconnected due to out of memory" on QoS1 disconnect (#3253/#2627)
+# 2.0.22 → fixes bogus OOM disconnect reporting
+# 2.0.23 → additional broker fixes (session/OpenSSL/persistence); tarball on mosquitto.org
+ARG MOSQUITTO_VERSION=2.0.23
 
 # Use debian:stable-slim as a builder for Mosquitto and dependencies.
 FROM debian:stable-slim as mosquitto_builder
 ARG MOSQUITTO_VERSION
-ARG LWS_VERSION
 
 # Get mosquitto build dependencies.
 RUN set -ex; \
     apt-get update; \
     apt-get install -y wget build-essential cmake libssl-dev libcjson-dev
 
-# Get libwebsocket. Debian's libwebsockets is too old for Mosquitto version > 2.x so it gets built from source.
-RUN set -ex; \
-    wget https://github.com/warmcat/libwebsockets/archive/v${LWS_VERSION}.tar.gz -O /tmp/lws.tar.gz; \
-    mkdir -p /build/lws; \
-    tar --strip=1 -xf /tmp/lws.tar.gz -C /build/lws; \
-    rm /tmp/lws.tar.gz; \
-    cd /build/lws; \
-    cmake . \
-        -DCMAKE_BUILD_TYPE=MinSizeRel \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DLWS_IPV6=ON \
-        -DLWS_WITHOUT_BUILTIN_GETIFADDRS=ON \
-        -DLWS_WITHOUT_CLIENT=ON \
-        -DLWS_WITHOUT_EXTENSIONS=ON \
-        -DLWS_WITHOUT_TESTAPPS=ON \
-        -DLWS_WITH_HTTP2=OFF \
-        -DLWS_WITH_SHARED=OFF \
-        -DLWS_WITH_ZIP_FOPS=OFF \
-        -DLWS_WITH_ZLIB=OFF \
-        -DLWS_WITH_EXTERNAL_POLL=ON; \
-    make -j "$(nproc)"; \
-    rm -rf /root/.cmake
-
 WORKDIR /app
 
 RUN mkdir -p mosquitto
 
-RUN wget http://mosquitto.org/files/source/mosquitto-${MOSQUITTO_VERSION}.tar.gz
+RUN wget https://mosquitto.org/files/source/mosquitto-${MOSQUITTO_VERSION}.tar.gz
 
 RUN tar xzvf mosquitto-${MOSQUITTO_VERSION}.tar.gz
 
-# Build mosquitto.
+# Build mosquitto without websockets (MQTT/TLS only in our deployment).
+# Avoids building libwebsockets, which fails on GCC 14 with LWS 4.2.2 (-Werror=enum-int-mismatch).
 RUN set -ex; \
     cd mosquitto-${MOSQUITTO_VERSION}; \
-    make CFLAGS="-Wall -O2 -I/build/lws/include" LDFLAGS="-L/build/lws/lib" WITH_WEBSOCKETS=yes; \
+    make CFLAGS="-Wall -O2" WITH_WEBSOCKETS=no; \
     make install;
 
 # Use debian:stable-slim as a builder for the Mosquitto Python Auth plugin.
@@ -85,16 +63,17 @@ COPY --from=mosquitto_builder /usr/local/include/ /usr/local/include/
 COPY --from=mosquitto_builder /usr/local/lib/ /usr/local/lib/
 
 COPY ./ ./
+# PYTHON_VERSION is auto-detected from system python3 (see Makefile)
 RUN set -ex; \
     make clean; \
-    make USE_CARES=1 PYTHON_VERSION=3.11
+    make USE_CARES=1
 
 #Start from a new image.
 FROM debian:stable-slim
 
 RUN set -ex; \
     apt update; \
-    apt install -y libc-ares2 openssl uuid tini wget cmake libssl-dev python3 python3-pip
+    apt install -y libc-ares2 libcjson1 openssl uuid tini wget cmake libssl-dev python3 python3-pip
 
 RUN mkdir -p /mosquitto/config /mosquitto/data /mosquitto/log
 RUN set -ex; \
